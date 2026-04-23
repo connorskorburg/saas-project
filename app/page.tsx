@@ -2,42 +2,30 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
 async function checkServices() {
-  const checks = {
-    supabase: false,
-    openai: false,
-    stripe: false,
-    posthog: false,
+  return {
+    supabase: !!(
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ),
+    openai: !!process.env.OPENAI_API_KEY,
+    stripe: !!process.env.STRIPE_SECRET_KEY,
+    posthog: !!(
+      process.env.NEXT_PUBLIC_POSTHOG_PROJECT_ID &&
+      process.env.NEXT_PUBLIC_POSTHOG_HOST
+    ),
   }
-
-  // Check Supabase
-  try {
-    const supabase = await createClient()
-    const { error } = await supabase.from('_health').select('*').limit(1)
-    checks.supabase = !error || error.code !== 'PGRST301' // Connection works even if table doesn't exist
-  } catch {
-    checks.supabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL
-  }
-
-  // Check OpenAI
-  checks.openai = !!process.env.OPENAI_API_KEY
-
-  // Check Stripe
-  checks.stripe = !!process.env.STRIPE_SECRET_KEY
-
-  // Check PostHog
-  checks.posthog = !!(
-    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_ID &&
-    process.env.NEXT_PUBLIC_POSTHOG_HOST
-  )
-
-  return checks
 }
 
 export default async function Home() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (error) {
+    console.error('Error fetching user:', error)
+  }
+
   const services = await checkServices()
 
   return (
